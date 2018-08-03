@@ -132,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
             mMediaRecorder.setOrientationHint(orientation);
             mMediaRecorder.prepare();
         } catch (IOException e) {
-            e.printStackTrace();
+            e.printStackTrace(); 
         }
     }
 
