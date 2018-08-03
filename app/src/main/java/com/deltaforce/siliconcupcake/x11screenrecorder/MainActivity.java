@@ -3,6 +3,7 @@ package com.deltaforce.siliconcupcake.x11screenrecorder;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
@@ -41,9 +42,10 @@ public class MainActivity extends AppCompatActivity {
     private MediaProjection mMediaProjection;//token grants ability to capture screen content;
     private VirtualDisplay mVirtualDisplay;
     private MediaProjectionCallback mMediaProjectionCallback;
-    private MediaRecorder mMediaRecorder;
+    public MediaRecorder mMediaRecorder;
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     private static final int REQUEST_PERMISSION_KEY = 1;
+    private int counter = 0;
 
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 90);
@@ -57,17 +59,19 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        String[] PERMISSIONS = {
+        SharedPreferences prefs = getSharedPreferences("MyPref", MODE_PRIVATE);
+        counter = prefs.getInt("counter" , 0);
+        final String[] PERMISSIONS = {
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.READ_EXTERNAL_STORAGE
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.RECORD_AUDIO
         };
-        Log.d("permission one", PERMISSIONS[0]);
-        Log.d("permission two", PERMISSIONS[1]);
-        if (!Function.hasPermissions(this, PERMISSIONS)) {
-            ActivityCompat.requestPermissions(this, PERMISSIONS, REQUEST_PERMISSION_KEY);
-
-
+        Log.d("write permission", PERMISSIONS[0]);
+        Log.d("read permission", PERMISSIONS[1]);
+        if (!Function.hasPermissions(MainActivity.this, PERMISSIONS)) {
+            ActivityCompat.requestPermissions(MainActivity.this, PERMISSIONS, REQUEST_PERMISSION_KEY);
         }
+
         DisplayMetrics metrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(metrics);
         mScreenDensity = metrics.densityDpi;
@@ -78,7 +82,9 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
 
+
                 onToggleScreenShare();
+
 
             }
         });
@@ -104,14 +110,20 @@ public class MainActivity extends AppCompatActivity {
 
     private void initRecorder() {
         try {
-
+            mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
             mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
             mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4); //THREE_GPP
             mMediaRecorder.setOutputFile(Environment
                     .getExternalStoragePublicDirectory(Environment
-                            .DIRECTORY_DOWNLOADS) + "/video.mp4");
+                            .DIRECTORY_DOWNLOADS) + "/video"+String.valueOf(counter)+".mp4");
+            counter++;
+            SharedPreferences pref = getApplicationContext().getSharedPreferences("MyPref", MODE_PRIVATE);
+            SharedPreferences.Editor editor = pref.edit();
+            editor.putInt("counter" , counter);
+            editor.commit();
             mMediaRecorder.setVideoSize(DISPLAY_WIDTH, DISPLAY_HEIGHT);
             mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+            mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
             mMediaRecorder.setVideoEncodingBitRate(512 * 1000);
             mMediaRecorder.setVideoFrameRate(16); // 30
             mMediaRecorder.setVideoEncodingBitRate(3000000);
@@ -126,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void shareScreen() {
         if (mMediaProjection == null) {
-            startActivityForResult(mProjectionManager.createScreenCaptureIntent(), REQUEST_CODE);
+            startActivityForResult(mProjectionManager.createScreenCaptureIntent(), REQUEST_CODE);//permission to record screen!
             return;
         }
         mVirtualDisplay = createVirtualDisplay();
@@ -144,8 +156,10 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Screen Cast Permission Denied", Toast.LENGTH_SHORT).show();
             isRecording = false;
             toggleButton.setChecked(false);
+            mMediaRecorder = new MediaRecorder();
             return;
         }
+        Log.d("REQUEST_CODE", String.valueOf(REQUEST_CODE));
         mMediaProjectionCallback = new MediaProjectionCallback();
         mMediaProjection = mProjectionManager.getMediaProjection(resultCode, data);
         mMediaProjection.registerCallback(mMediaProjectionCallback, null);
@@ -225,6 +239,7 @@ public class MainActivity extends AppCompatActivity {
         switch (requestCode) {
             case REQUEST_PERMISSION_KEY: {
                 if ((grantResults.length > 0) && (grantResults[0] + grantResults[1]) == PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(this, "Screen Cast Permission Granted", Toast.LENGTH_SHORT).show();
 
                 } else {
                     isRecording = false;
